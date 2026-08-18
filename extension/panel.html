@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lead Grabber</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 16px;
+            min-width: 280px;
+        }
+        h2 {
+            text-align: center;
+            color: #00d4ff;
+            font-size: 18px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 3px; }
+        .form-group input {
+            width: 100%; padding: 8px; background: #16213e; border: 1px solid #333;
+            border-radius: 4px; color: #fff; font-size: 14px; outline: none;
+        }
+        .form-group input:focus { border-color: #00d4ff; }
+        .form-row { display: flex; gap: 8px; }
+        .form-row .form-group { flex: 1; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .stat {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+        }
+        .stat .label { font-size: 10px; color: #888; }
+        .stat .value { font-size: 20px; font-weight: bold; }
+        .stat .value.green { color: #00e676; }
+        .stat .value.yellow { color: #ffc107; }
+        .stat .value.red { color: #ff5252; }
+
+        .btn {
+            display: block; width: 100%; padding: 12px;
+            margin-bottom: 8px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #00d4ff, #0077b6);
+            color: #fff;
+        }
+        .btn-start:hover { opacity: 0.9; }
+        .btn-start:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-stop { background: #ff5252; color: #fff; }
+        .btn-stop:hover { background: #d32f2f; }
+        .btn-clear { background: #333; color: #888; font-size: 12px; padding: 8px; }
+        .hidden { display: none !important; }
+
+        .log {
+            background: #0d1117;
+            color: #39d353;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log:empty { display: none; }
+
+        a { color: #00d4ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .footer { text-align: center; margin-top: 12px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h2>🔗 LinkedIn Lead Grabber</h2>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Job Title</label>
+            <input type="text" id="input-title" placeholder="CEO" value="CEO">
+        </div>
+        <div class="form-group">
+            <label>Location</label>
+            <input type="text" id="input-location" placeholder="Kolkata" value="Kolkata">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Profile Limit</label>
+        <input type="number" id="input-limit" value="20" min="1" max="500">
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="label">Saved</div>
+            <div class="value green" id="count-saved">0</div>
+        </div>
+        <div class="stat">
+            <div class="label">Dupes</div>
+            <div class="value yellow" id="count-dupes">0</div>
+        </div>
+        <div class="stat">
+            <div class="label">Errors</div>
+            <div class="value red" id="count-errors">0</div>
+        </div>
+    </div>
+
+    <button id="btn-start" class="btn btn-start">▶ Start Auto-Grabbing</button>
+    <button id="btn-stop" class="btn btn-stop hidden">⛔ Stop</button>
+    <button id="btn-clear" class="btn btn-clear">Clear Log</button>
+
+    <div id="log" class="log"></div>
+
+    <div class="footer">
+        <a href="http://localhost/linkedin-ceo/dashboard/index.html" target="_blank">Open Dashboard ↗</a>
+    </div>
+
+    <script src="panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Lead Grabber",
+  "version": "5.0",
+  "description": "Auto-visit LinkedIn profiles from Google search and save to database.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "*://*.google.com/*",
+    "*://*.google.co.in/*",
+    "*://*.linkedin.com/*",
+    "http://localhost/*"
+  ],
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "action": {
+    "default_title": "Open Lead Grabber"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Leads Dashboard</title>
+    <style>
+        :root {
+            --primary: #0a66c2;
+            --bg-color: #f3f2ef;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: var(--primary);
+            margin: 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #666;
+        }
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+        }
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        button:hover {
+            background-color: #004182;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #bb2d3b;
+        }
+        table {
+            width: 100%;
+            background: white;
+            border-collapse: collapse;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>LinkedIn Leads Dashboard</h1>
+            <div>
+                <button onclick="fetchData()">Refresh Data</button>
+                <button onclick="exportCSV()">Export CSV</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Profiles</h3>
+                <div class="value" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Companies</h3>
+                <div class="value" id="stat-companies">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>CEO Count</h3>
+                <div class="value" id="stat-ceos">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Founder Count</h3>
+                <div class="value" id="stat-founders">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="search-input" placeholder="Search by name..." onkeyup="filterTable()">
+            <select id="filter-designation" onchange="filterTable()">
+                <option value="">All Designations</option>
+            </select>
+            <select id="filter-company" onchange="filterTable()">
+                <option value="">All Companies</option>
+            </select>
+        </div>
+
+        <table id="leads-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Job Title</th>
+                    <th>Company</th>
+                    <th>LinkedIn Profile</th>
+                    <th>Date Added</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Rows will be populated here -->
+            </tbody>
+        </table>
+        <div id="empty-message" class="empty-state" style="display: none;">No records found.</div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost/linkedin-ceo/backend";
+        let allData = [];
+
+        document.addEventListener('DOMContentLoaded', fetchData);
+
+        async function fetchData() {
+            try {
+                const response = await fetch(`${API_BASE}/get_executives.php`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    allData = result.data;
+                    updateDashboard(allData);
+                    populateFilters(allData);
+                } else {
+                    alert("Error fetching data: " + result.message);
+                }
+            } catch (e) {
+                alert("Failed to connect to backend. Make sure XAMPP is running.");
+                console.error(e);
+            }
+        }
+
+        function updateDashboard(data) {
+            // Update Stats
+            document.getElementById('stat-total').innerText = data.length;
+            
+            const companies = new Set(data.map(item => item.company_name).filter(c => c));
+            document.getElementById('stat-companies').innerText = companies.size;
+            
+            const ceos = data.filter(item => item.job_title && item.job_title.toLowerCase().includes('ceo')).length;
+            document.getElementById('stat-ceos').innerText = ceos;
+            
+            const founders = data.filter(item => item.job_title && item.job_title.toLowerCase().includes('founder')).length;
+            document.getElementById('stat-founders').innerText = founders;
+
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('table-body');
+            const emptyMsg = document.getElementById('empty-message');
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                emptyMsg.style.display = 'block';
+                document.getElementById('leads-table').style.display = 'none';
+                return;
+            }
+
+            emptyMsg.style.display = 'none';
+            document.getElementById('leads-table').style.display = 'table';
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHTML(item.full_name)}</td>
+                    <td>${escapeHTML(item.job_title || '-')}</td>
+                    <td>${escapeHTML(item.company_name || '-')}</td>
+                    <td><a href="${item.linkedin_profile_url}" target="_blank">View Profile</a></td>
+                    <td>${new Date(item.created_at).toLocaleDateString()}</td>
+                    <td><button class="danger" onclick="deleteRecord(${item.id})">Delete</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function populateFilters(data) {
+            const designations = new Set();
+            const companies = new Set();
+            
+            data.forEach(item => {
+                if (item.job_title) designations.add(item.job_title);
+                if (item.company_name) companies.add(item.company_name);
+            });
+
+            const desSelect = document.getElementById('filter-designation');
+            const compSelect = document.getElementById('filter-company');
+            
+            // Keep first option
+            desSelect.innerHTML = '<option value="">All Designations</option>';
+            compSelect.innerHTML = '<option value="">All Companies</option>';
+
+            [...designations].sort().forEach(des => {
+                const opt = document.createElement('option');
+                opt.value = des;
+                opt.innerText = des;
+                desSelect.appendChild(opt);
+            });
+
+            [...companies].sort().forEach(comp => {
+                const opt = document.createElement('option');
+                opt.value = comp;
+                opt.innerText = comp;
+                compSelect.appendChild(opt);
+            });
+        }
+
+        function filterTable() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const designation = document.getElementById('filter-designation').value;
+            const company = document.getElementById('filter-company').value;
+
+            const filtered = allData.filter(item => {
+                const matchSearch = item.full_name.toLowerCase().includes(search);
+                const matchDes = designation === "" || item.job_title === designation;
+                const matchComp = company === "" || item.company_name === company;
+                return matchSearch && matchDes && matchComp;
+            });
+
+            renderTable(filtered);
+        }
+
+        async function deleteRecord(id) {
+            if (!confirm("Are you sure you want to delete this profile?")) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/delete_executive.php?id=${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    fetchData(); // Refresh table
+                } else {
+                    alert("Delete failed: " + result.message);
+                }
+            } catch (e) {
+                alert("Failed to connect to backend.");
+                console.error(e);
+            }
+        }
+
+        function exportCSV() {
+            if (allData.length === 0) return;
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Name,Job Title,Company,LinkedIn URL,Source URL,Date Added\n";
+            
+            allData.forEach(row => {
+                const r = [
+                    `"${(row.full_name || '').replace(/"/g, '""')}"`,
+                    `"${(row.job_title || '').replace(/"/g, '""')}"`,
+                    `"${(row.company_name || '').replace(/"/g, '""')}"`,
+                    `"${row.linkedin_profile_url || ''}"`,
+                    `"${row.source_url || ''}"`,
+                    `"${row.created_at || ''}"`
+                ];
+                csvContent += r.join(",") + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "linkedin_leads.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function escapeHTML(str) {
+            return str ? str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag)) : '';
+        }
+    </script>
+</body>
+</html>
