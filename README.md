@@ -40,6 +40,14 @@
    *(Or click the "Open Admin Dashboard" link in the extension popup).*
 2. The dashboard allows you to:
    - View the total number of profiles, companies, CEOs, and Founders.
+   - Choose Grok, Gemini, or a local/OpenAI-compatible API and describe your sales niche.
+   - Generate a personalised draft for each lead, then use **Open message** to open that lead's LinkedIn profile in a new tab with the draft inserted. Review and send each message yourself.
+
+## AI message setup
+
+1. Open the dashboard and choose your provider. Gemini uses its official OpenAI-compatible endpoint; for Ollama, LM Studio, vLLM, OpenAI, or similar, choose **Custom / local compatible API** and provide that provider's full `/chat/completions` URL, model, and API key if required. A base local address such as `http://192.168.29.22` is also accepted and becomes `/v1/chat/completions` automatically.
+2. Click **Save settings**. The local backend creates the required `app_settings` table and `message_draft` column automatically.
+3. Use **Generate message** beside a lead. Then click **Open message** to draft it in LinkedIn. Reload the unpacked extension once after this upgrade so the dashboard bridge is enabled.
    - Search by name.
    - Filter by specific Job Title or Company.
    - Delete individual records.

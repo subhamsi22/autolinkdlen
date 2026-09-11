@@ -16,6 +16,12 @@
     "*://*.linkedin.com/*",
     "http://localhost/*"
   ],
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/linkedin-ceo/dashboard/*"],
+      "js": ["dashboard-bridge.js"]
+    }
+  ],
   "side_panel": {
     "default_path": "panel.html"
   },
