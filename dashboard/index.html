@@ -65,6 +65,26 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             flex-wrap: wrap;
         }
+        .messaging-settings {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .messaging-settings h2 { margin: 0 0 8px; color: var(--primary); font-size: 20px; }
+        .messaging-settings p { margin: 0 0 14px; color: #555; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 2fr 150px; gap: 12px; align-items: end; }
+        .settings-grid label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 600; }
+        .settings-grid input, .settings-grid textarea { box-sizing: border-box; width: 100%; min-width: 0; }
+        .settings-grid textarea { min-height: 72px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font: inherit; resize: vertical; }
+        .status { margin-top: 10px; font-size: 13px; color: #555; }
+        .draft-cell { max-width: 280px; white-space: normal; font-size: 13px; color: #555; }
+        .action-buttons { display: flex; gap: 7px; flex-wrap: wrap; }
+        .action-buttons button { padding: 7px 10px; }
+        .secondary { background-color: #52616b; }
+        .secondary:hover { background-color: #34424b; }
+        @media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } }
         input, select {
             padding: 8px 12px;
             border: 1px solid var(--border-color);
@@ -134,6 +154,7 @@
             <h1>LinkedIn Leads Dashboard</h1>
             <div>
                 <button onclick="fetchData()">Refresh Data</button>
+                <button onclick="generateAllMessages()">Generate messages</button>
                 <button onclick="exportCSV()">Export CSV</button>
             </div>
         </div>
@@ -157,6 +178,35 @@
             </div>
         </div>
 
+        <section class="messaging-settings">
+            <h2>AI outreach messages</h2>
+            <p>Choose Grok, Gemini, or a local/OpenAI-compatible provider, then describe what you sell. The key stays on this local server and is never returned to the dashboard.</p>
+            <div class="settings-grid">
+                <div>
+                    <label for="ai-provider">AI provider</label>
+                    <select id="ai-provider" onchange="updateProviderFields()">
+                        <option value="grok">Grok (xAI)</option>
+                        <option value="gemini">Gemini (Google)</option>
+                        <option value="custom">Custom / local compatible API</option>
+                    </select>
+                    <label for="grok-api-key" id="api-key-label" style="margin-top: 10px;">API key</label>
+                    <input type="password" id="grok-api-key" placeholder="xai-..." autocomplete="off">
+                </div>
+                <div>
+                    <label for="sales-niche">What you sell / your niche</label>
+                    <textarea id="sales-niche" placeholder="Example: We help B2B SaaS teams reduce customer support workload with AI automation."></textarea>
+                </div>
+                <div>
+                    <label for="grok-model">Model</label>
+                    <input type="text" id="grok-model" value="grok-4.6">
+                    <label for="ai-endpoint" id="endpoint-label" style="margin-top: 10px; display: none;">Local server address or chat-completions URL</label>
+                    <input type="url" id="ai-endpoint" placeholder="http://192.168.29.22 or http://localhost:11434/v1/chat/completions" style="display: none;">
+                    <button style="margin-top: 8px; width: 100%;" onclick="saveSettings()">Save settings</button>
+                </div>
+            </div>
+            <div id="settings-status" class="status">Loading message settings…</div>
+        </section>
+
         <div class="controls">
             <input type="text" id="search-input" placeholder="Search by name..." onkeyup="filterTable()">
             <select id="filter-designation" onchange="filterTable()">
@@ -174,6 +224,7 @@
                     <th>Job Title</th>
                     <th>Company</th>
                     <th>LinkedIn Profile</th>
+                    <th>Message Draft</th>
                     <th>Date Added</th>
                     <th>Action</th>
                 </tr>
@@ -189,7 +240,64 @@
         const API_BASE = "http://localhost/linkedin-ceo/backend";
         let allData = [];
 
-        document.addEventListener('DOMContentLoaded', fetchData);
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            loadSettings();
+        });
+
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings.php`);
+                const settings = await response.json();
+                if (!settings.success) throw new Error(settings.message || 'Could not load settings.');
+                document.getElementById('sales-niche').value = settings.sales_niche || '';
+                document.getElementById('grok-model').value = settings.grok_model || 'grok-4.6';
+                document.getElementById('ai-provider').value = settings.ai_provider || 'grok';
+                document.getElementById('ai-endpoint').value = settings.ai_endpoint || '';
+                updateProviderFields();
+                document.getElementById('settings-status').innerText = settings.has_api_key
+                    ? 'API key saved. Leave the key field blank to keep it unchanged.'
+                    : 'Add an API key where required and your niche before generating messages.';
+            } catch (error) {
+                document.getElementById('settings-status').innerText = error.message;
+            }
+        }
+
+        async function saveSettings() {
+            const status = document.getElementById('settings-status');
+            status.innerText = 'Saving…';
+            try {
+                const response = await fetch(`${API_BASE}/settings.php`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        grok_api_key: document.getElementById('grok-api-key').value,
+                        sales_niche: document.getElementById('sales-niche').value,
+                        grok_model: document.getElementById('grok-model').value,
+                        ai_provider: document.getElementById('ai-provider').value,
+                        ai_endpoint: document.getElementById('ai-endpoint').value
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message || 'Could not save settings.');
+                document.getElementById('grok-api-key').value = '';
+                status.innerText = 'Settings saved. You can now generate drafts.';
+            } catch (error) { status.innerText = error.message; }
+        }
+
+        function updateProviderFields() {
+            const provider = document.getElementById('ai-provider').value;
+            const model = document.getElementById('grok-model');
+            const endpoint = document.getElementById('ai-endpoint');
+            const endpointLabel = document.getElementById('endpoint-label');
+            const key = document.getElementById('grok-api-key');
+            const defaults = { grok: 'grok-4.6', gemini: 'gemini-3.8-flash', custom: 'llama3.2' };
+            if (!model.value || Object.values(defaults).includes(model.value)) model.value = defaults[provider];
+            const custom = provider === 'custom';
+            endpoint.style.display = custom ? 'block' : 'none';
+            endpointLabel.style.display = custom ? 'block' : 'none';
+            key.placeholder = provider === 'gemini' ? 'Gemini API key' : custom ? 'Optional for local APIs' : 'xai-...';
+            document.getElementById('api-key-label').innerText = custom ? 'API key (optional for local)' : 'API key';
+        }
 
         async function fetchData() {
             try {
@@ -246,11 +354,66 @@
                     <td>${escapeHTML(item.job_title || '-')}</td>
                     <td>${escapeHTML(item.company_name || '-')}</td>
                     <td><a href="${item.linkedin_profile_url}" target="_blank">View Profile</a></td>
+                    <td class="draft-cell" id="draft-${item.id}">${escapeHTML(item.message_draft || 'No draft yet')}</td>
                     <td>${new Date(item.created_at).toLocaleDateString()}</td>
-                    <td><button class="danger" onclick="deleteRecord(${item.id})">Delete</button></td>
+                    <td><div class="action-buttons">
+                        <button onclick="generateMessage(${item.id})">Generate message</button>
+                        <button class="secondary" onclick="openMessage(${item.id})" ${item.message_draft ? '' : 'disabled'}>Open message</button>
+                        <button class="danger" onclick="deleteRecord(${item.id})">Delete</button>
+                    </div></td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        async function generateMessage(id) {
+            const row = allData.find(item => Number(item.id) === Number(id));
+            if (!row) return false;
+            const draftCell = document.getElementById(`draft-${id}`);
+            draftCell.innerText = 'Generating a personalised draft…';
+            try {
+                const response = await fetch(`${API_BASE}/generate_message.php`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lead_id: id })
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message || 'Message generation failed.');
+                row.message_draft = result.message;
+                filterTable();
+                return true;
+            } catch (error) {
+                draftCell.innerText = 'No draft yet';
+                alert(error.message);
+                return false;
+            }
+        }
+
+        async function generateAllMessages() {
+            const visibleRows = getFilteredRows();
+            if (!visibleRows.length) return;
+            if (!confirm(`Generate a draft for ${visibleRows.length} visible lead(s)? This may use your API credits.`)) return;
+            const status = document.getElementById('settings-status');
+            let completed = 0;
+            for (const lead of visibleRows) {
+                status.innerText = `Generating ${completed + 1} of ${visibleRows.length}…`;
+                if (await generateMessage(lead.id)) completed++;
+            }
+            status.innerText = `Generated ${completed} of ${visibleRows.length} drafts.`;
+        }
+
+        function openMessage(id) {
+            const lead = allData.find(item => Number(item.id) === Number(id));
+            if (!lead || !lead.message_draft) return;
+            const requestId = `message-${id}-${Date.now()}`;
+            const onResponse = (event) => {
+                if (event.source !== window || event.origin !== window.location.origin) return;
+                if (event.data?.source !== 'linkedin-leads-extension' || event.data.requestId !== requestId) return;
+                window.removeEventListener('message', onResponse);
+                if (!event.data.success) alert(event.data.message || 'Could not ask the extension to open LinkedIn. Reload the extension and dashboard, then try again.');
+            };
+            window.addEventListener('message', onResponse);
+            window.postMessage({ source: 'linkedin-leads-dashboard', action: 'open_message_compose', requestId, profileUrl: lead.linkedin_profile_url, message: lead.message_draft }, window.location.origin);
+            setTimeout(() => window.removeEventListener('message', onResponse), 5000);
         }
 
         function populateFilters(data) {
@@ -285,18 +448,21 @@
         }
 
         function filterTable() {
+            renderTable(getFilteredRows());
+        }
+
+        function getFilteredRows() {
             const search = document.getElementById('search-input').value.toLowerCase();
             const designation = document.getElementById('filter-designation').value;
             const company = document.getElementById('filter-company').value;
 
-            const filtered = allData.filter(item => {
+            return allData.filter(item => {
                 const matchSearch = item.full_name.toLowerCase().includes(search);
                 const matchDes = designation === "" || item.job_title === designation;
                 const matchComp = company === "" || item.company_name === company;
                 return matchSearch && matchDes && matchComp;
             });
 
-            renderTable(filtered);
         }
 
         async function deleteRecord(id) {

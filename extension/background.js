@@ -14,14 +14,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse(s);
         });
         return true;
+    } else if (msg.action === "open_message_compose") {
+        openMessageComposer(msg.profileUrl, msg.message)
+            .then(() => sendResponse({ success: true }))
+            .catch((error) => sendResponse({ success: false, message: error.message }));
+        return true;
     }
 });
+
+// Opens a separate profile tab, then opens the native message panel and inserts a draft.
+// Sending is deliberately left to the user.
+async function openMessageComposer(profileUrl, message) {
+    if (!/^https:\/\/(www\.)?linkedin\.com\/in\//i.test(profileUrl || '')) {
+        throw new Error('A valid LinkedIn profile URL is required.');
+    }
+    if (!String(message || '').trim()) {
+        throw new Error('Generate a message before opening LinkedIn.');
+    }
+
+    const tab = await chrome.tabs.create({ url: profileUrl, active: true });
+    await chrome.storage.session.set({
+        [`messageDraft:${tab.id}`]: String(message).trim()
+    });
+}
 
 // ─── Tab navigation completed listener ───────────────────────────────────────
 // This fires EVERY time any tab finishes loading. We check if it's our tab.
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status !== "complete") return;
     if (!tab.url) return;
+
+    const draftKey = `messageDraft:${tabId}`;
+    const pendingDraft = await chrome.storage.session.get(draftKey);
+    if (pendingDraft[draftKey] && tab.url.includes('linkedin.com/in/')) {
+        await chrome.storage.session.remove(draftKey);
+        await sleep(1800);
+        await insertLinkedInDraft(tabId, pendingDraft[draftKey]);
+        return;
+    }
 
     const state = await chrome.storage.local.get(['automating', 'autoTabId']);
     if (!state.automating) return;
@@ -59,6 +89,46 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         }
     }
 });
+
+async function insertLinkedInDraft(tabId, message) {
+    try {
+        const result = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: async (draft) => {
+                const waitFor = async (getElement, timeout = 15000) => {
+                    const started = Date.now();
+                    while (Date.now() - started < timeout) {
+                        const element = getElement();
+                        if (element) return element;
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    return null;
+                };
+
+                const messageButton = await waitFor(() => Array.from(document.querySelectorAll('button, a'))
+                    .find(el => /^(message|send message)$/i.test((el.innerText || el.getAttribute('aria-label') || '').trim())));
+                if (!messageButton) return { success: false, message: 'LinkedIn Message button was not found.' };
+                messageButton.click();
+
+                const editor = await waitFor(() => document.querySelector('[contenteditable="true"][role="textbox"]')
+                    || document.querySelector('[contenteditable="true"].msg-form__contenteditable'));
+                if (!editor) return { success: false, message: 'LinkedIn message editor did not open.' };
+
+                editor.focus();
+                document.execCommand('selectAll', false, null);
+                document.execCommand('insertText', false, draft);
+                if (!editor.innerText.trim()) editor.textContent = draft;
+                editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: draft }));
+                editor.dispatchEvent(new Event('change', { bubbles: true }));
+                return { success: true };
+            },
+            args: [message]
+        });
+        if (!result[0]?.result?.success) log(`⚠️ ${result[0]?.result?.message || 'Could not insert message draft.'}`);
+    } catch (error) {
+        log(`⚠️ Could not open LinkedIn composer: ${error.message}`);
+    }
+}
 
 // ─── Start Automation ─────────────────────────────────────────────────────────
 async function startAutomation(tabId, googleUrl, limit) {

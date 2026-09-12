@@ -35,8 +35,18 @@ CREATE TABLE `executives` (
   `linkedin_profile_url` varchar(500) NOT NULL,
   `company_linkedin_url` varchar(500) DEFAULT NULL,
   `source_url` varchar(500) DEFAULT NULL,
+  `message_draft` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Local settings for the outreach dashboard. The Grok key is intentionally
+-- omitted from this sample export; save it through the dashboard after import.
+CREATE TABLE `app_settings` (
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
